@@ -6,14 +6,16 @@ use actix::AsyncContext;
 use std::time::{Duration, Instant};
 
 use sysinfo::{System};
+use std::fs;
 
 struct MyWs {
-    heartbeat: Instant
+    heartbeat: Instant,
+    file_listing: Instant
 }
 
 impl MyWs {
     pub fn new() -> Self {
-        Self { heartbeat: Instant::now() }
+        Self { heartbeat: Instant::now(), file_listing: Instant::now() }
     }
 
     fn heartbeat(&mut self, ctx: &mut <Self as Actor>::Context) {
@@ -25,6 +27,23 @@ impl MyWs {
             ctx.text(format!("Total memory usage: {} gigabytes", sys.used_memory() as f32/1024.0/1024.0/1024.0));
         });
     }
+    fn file_listing(&mut self, ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(Duration::from_secs(5), |act, ctx| {
+            let path = "/mnt/data/";
+
+            let mut file_list = "".to_owned();
+
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        file_list.push_str(&entry.file_name().to_string_lossy());
+                        file_list.push_str(" - ");
+                    }
+                }
+            }
+            ctx.text(format!("Files found: {} in path {}", file_list, path));
+        });
+    }
 }
 
 impl Actor for MyWs {
@@ -32,6 +51,7 @@ impl Actor for MyWs {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.heartbeat(ctx);
+        self.file_listing(ctx);
     }
 }
 
